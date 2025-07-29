@@ -1,36 +1,84 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# USE SEQUELIZE WITH NEXTJS
 
-## Getting Started
+## Required dependencies
 
-First, run the development server:
+To run migrations we need sequelize-cli and for envirorments variables dotenv-cli
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```sh
+bun install --save-dev sequelize-cli dotenv-cli
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Now we needs:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+bun install oracledb sequelize sequelize-typescript --save
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Now we need to init sequelize
 
-## Learn More
+```bash
+bunx sequelize-cli init
+```
 
-To learn more about Next.js, take a look at the following resources:
+Sequelize-cli init command will generate necessary files, but unfortunately it will spread in all those files in the root folder. It's better to re-organize the root creating a database folder to the root of our project
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Create a config file
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Inside the config folder delete the default config.json and create a config.mjs file with the following code:
 
-## Deploy on Vercel
+```mjs
+/* eslint-disable import/no-anonymous-default-export */
+export const options = {
+  username: process.env.DB_USERNAME,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  host: process.env.DB_HOST,
+  port: Number(process.env.DB_PORT),
+  dialect: "oracle",
+  logging: process.env.NODE_ENV === "development" ? console.log : false,
+  migrationStorageTableName: "migrations",
+};
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+if (process.env.NODE_ENV === "production") {
+  options.dialectOptions = {
+    ssl: {
+      rejectUnhautorized: true,
+    },
+  };
+}
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+export default {
+  development: options,
+  test: options,
+  production: options,
+};
+```
+
+Now in the root of the project create a .sequelizerc file with the following code:
+
+```ts
+const path = require("path");
+
+module.exports = {
+  config: path.resolve("database", "config/config.mjs"),
+  "seeders-path": path.resolve("database", "seeders"),
+  "migrations-path": path.resolve("database", "migrations"),
+};
+```
+
+Now, inside the package.json add the following lines in the scripts section:
+
+```json
+    "migration:create": "dotenv -- sequelize-cli migration:create",
+    "migrate": "dotenv -- sequelize-cli db:migrate",
+    "migrate:rollback": "dotenv -- sequelize-cli db:migrate:undo",
+    "migrate:rollback:all": "dotenv -- sequelize-cli db:migrate:undo:all"
+```
+
+## Create the first migration
+
+Run this command in the terminal:
+
+```bash
+bun run migration:create -- --name create-users-table
+```
